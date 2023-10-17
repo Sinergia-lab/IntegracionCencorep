@@ -3051,10 +3051,10 @@ class Odoo:
                     'x_studio_stage_id' : 2,
                     'x_studio_es_txd':1,
                 })
-                ids_nuevos = self.productos.create(listado_productos_crear)
-                nuevos_productos = [{'id':x[0], 'x_name': x[1]['x_name'], 'x_studio_sku_unidad_de_negocio':x[1]['x_studio_sku_unidad_de_negocio']} for x in zip(ids_nuevos,listado_productos_crear)]
-                self.conjuntoProductosTXD = self.conjuntoProductosTXD + nuevos_productos
-                self.productosTXD_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosTXD}
+        ids_nuevos = self.productos.create(listado_productos_crear)
+        nuevos_productos = [{'id':x[0], 'x_name': x[1]['x_name'], 'x_studio_sku_unidad_de_negocio':x[1]['x_studio_sku_unidad_de_negocio']} for x in zip(ids_nuevos,listado_productos_crear)]
+        self.conjuntoProductosTXD = self.conjuntoProductosTXD + nuevos_productos
+        self.productosTXD_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosTXD}
 
     def revisarDF_TXD_multiple(self,dataframe,tempo):
 
