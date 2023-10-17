@@ -3102,7 +3102,11 @@ class Odoo:
             self.crearProductos_multiple(prods_nuevos[i:i+chunk_size])
         
         # CREAR VENTAS NUEVAS
-        ventas_nuevas = list(filas_ventas.apply(row2venta,axis=1))
+        ventas_nuevas_ = list(filas_ventas.apply(row2venta,axis=1))
+        ventas_nuevas = []
+        for venta in ventas_nuevas_:
+            if not self.buscarVentaRam(venta):
+                ventas_nuevas.append(venta)
         for i in range(0,len(ventas_nuevas),chunk_size):
             if not tempo.verificarTiempoLimite(time.time()):
                 return 0
