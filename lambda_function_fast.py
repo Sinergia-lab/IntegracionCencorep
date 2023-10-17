@@ -3205,10 +3205,15 @@ def procesarFecha(fecha):
     return(fechaSeparada)
 
 # ===== CREACION RAPIDA ======
-def procesar_origen(origen):
-    if origen=='I':     return 'IMPORTADO'
-    elif origen=='N':   return 'NACIONAL'
-    else:               return  'IMPORTADO'
+def procesar_origen(origen,unidad_negocio):
+    if unidad_negocio=='TXD':
+        if origen=='I':     return 'IMPORTADO'
+        elif origen=='N':   return 'NACIONAL'
+        else:               return  'IMPORTADO'
+    elif unidad_negocio=='MDH':
+        if origen=='Importado':     return 'IMPORTADO'
+        elif origen=='Nacional':    return 'NACIONAL'
+        else:                       return ''
 
 def procesar_fecha_fast(date):
     mes,anho = date.split('-')
