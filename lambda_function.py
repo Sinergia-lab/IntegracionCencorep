@@ -10,7 +10,6 @@ from botocore.exceptions import ClientError
 import logging
 import time
 import datetime
-import numpy as np
 
 
 ODOO_USERNAME = os.environ['odoo_username']
@@ -19,7 +18,6 @@ ODOO_HOSTNAME = os.environ['odoo_hostname']
 ODOO_DATABASE = os.environ['odoo_database']
 BUCKET_NAME = os.environ['bucket_name_cencosud']
 TIME_LIMIT = float(os.environ['tiempo_limite_ejecucion'])
-DAY_LIMIT = int(os.environ['dias_limites_duracion_objs'])
 
 
 
@@ -207,7 +205,6 @@ class ActorRelevante:
 
         pass
 
-
 class DataFrame:
     def __init__(self,tipo,dataFrame,unidadNegocio,keyObj,nombrebucket):
         self.tipo=tipo
@@ -225,9 +222,7 @@ class Aws:
         if bucket:
             return bucket
     def getListadoArchivos(self,bucket, prefix=None):
-
         objetos=bucket.objects.filter(Prefix=prefix)
-
         print(objetos)
         for obj in objetos:
             print(obj.key)
@@ -261,10 +256,6 @@ class Aws:
                 return 'insumo_SM'
             elif obj.key.find('_LeyRep_Venta_SM')>0:
                 return 'venta_SM'
-            elif obj.key.find('_CATEGORIA_LEYREPCL_SMK')>0:
-                return 'categoria_SM'
-            elif obj.key.find('_PROVEEDOR_LEYREPCL_SMK')>0:
-                return 'proveedor_SM'
             else:
                 return 'Nombre_archivo_no_reconocido'
         elif unidadNeg=='MDH':
@@ -274,10 +265,6 @@ class Aws:
                 return 'insumo_MDH'
             elif obj.key.find('_LeyRep_Venta_MDH')>0:
                 return 'venta_MDH'
-            elif obj.key.find('_CATEGORIA_LEYREPCL_MDH')>0:
-                return 'categoria_MDH'
-            elif obj.key.find('_PROVEEDOR_LEYREPCL_MDH')>0:
-                return 'proveedor_MDH'
             else:
                 return 'Nombre_archivo_no_reconocido'
         elif unidadNeg=='TXD':
@@ -332,11 +319,7 @@ class Aws:
             Bucket=nombreBucket,
             Key=keyObj
         )
-    def eliminarDocumentoFolder(self,nombreBucket,keyObj):
-        self.s3_resource.meta.client.delete_object(
-            Bucket=nombreBucket,
-            Key=keyObj
-        )
+
     def upload_file(self,file_name, bucket, object_name=None):
         """Upload a file to an S3 bucket
 
@@ -358,7 +341,7 @@ class Aws:
             logging.error(e)
             return False
         return True
-    def obtenerDataFrames(self,unidadNeg,nombreBucket,tipo,modoCarga):
+    def obtenerDataFrames(self,unidadNeg,nombreBucket,tipo):
         bb=self.obtenerBucket(nombreBucket)
         listadoArchivos=self.getListadoArchivos(bb,unidadNeg+'/')
         dataFrames=[]
@@ -369,41 +352,13 @@ class Aws:
                 if not archivo.key==unidadNeg+'/':
                     nombreobj=self.getNombreObjetoDB(archivo,unidadNeg)
                     rutaDestino='/tmp/'+nombreobj
-                    if modoCarga=='cencoOdoo':
-                        valor=archivo.key.find('.csv')
-                        if valor!=-1:
-                            self.descargarArchivo(bb,archivo.key,rutaDestino)
-                            df = DataFrame(self.getNombreObjetoDB(archivo,unidadNeg),cargarDataFrame(rutaDestino,tipo),unidadNeg,archivo.key,nombreBucket)
-                            dataFrames.append(df)
-                    elif modoCarga=='declaracionSIG':        
-                        valor=archivo.key.find('(COMPLETADO)')
-                        if valor==-1:
-                            self.descargarArchivo(bb,archivo.key,rutaDestino)
-                            df = DataFrame(self.getNombreObjetoDB(archivo,unidadNeg),cargarDataFrame(rutaDestino,tipo),unidadNeg,archivo.key,nombreBucket)
-                            dataFrames.append(df)
+                    valor=archivo.key.find('(COMPLETADO)')
+                    if valor==-1:
+                        self.descargarArchivo(bb,archivo.key,rutaDestino)
+                        df = DataFrame(self.getNombreObjetoDB(archivo,unidadNeg),cargarDataFrame(rutaDestino,tipo),unidadNeg,archivo.key,nombreBucket)
+                        dataFrames.append(df)
             return dataFrames
         return None
-
-    def eliminarDocumentosAntiguos(self,nombeBucket,folder):
-        bb=self.obtenerBucket(nombeBucket)
-        prefijo=folder+'/'
-        listadoArchivos=self.getListadoArchivos(bb,prefix=prefijo)
-        if listadoArchivos:        
-            for archivo in listadoArchivos:
-                nombreSinCarpeta=archivo.key.replace(prefijo,'')
-                if not nombreSinCarpeta =='':
-                    ultimaActualizacionObj=archivo.last_modified.replace(tzinfo=None)
-                    now=datetime.datetime.now()
-                    resta=now-ultimaActualizacionObj
-                    if resta.days>DAY_LIMIT:
-                        print ('Eliminando archivo '+ archivo.key)
-
-                        self.eliminarDocumentoFolder(nombeBucket,archivo.key)
-
-
-
-
-
 class Odoo:
     #PARÁMETROS INICIALES
     def __init__(self,hostname,database,login,password):
@@ -442,7 +397,7 @@ class Odoo:
         self.grupoEcotasa=self.conexion.get_model('x_ecotasa_grupos_skus')
         #conjuntos de registros
         
-        self.conjuntoProductosSMK=self.traerProductos('SMK')
+        '''self.conjuntoProductosSMK=self.traerProductos('SMK')
         self.conjuntoProductosMDH=self.traerProductos('MDH')
         self.conjuntoProductosTXD=self.traerProductos('TXD')
         self.conjuntoProveedores=self.traerProveedores()
@@ -458,29 +413,14 @@ class Odoo:
         self.conjuntoGrupo=self.traerCategorias('x_grupo')
         self.conjuntoVentasSMK=self.traerVentas('SMK')
         self.conjuntoVentasMDH=self.traerVentas('MDH')
-        self.conjuntoVentasTXD=self.traerVentas('TXD')
+        self.conjuntoVentasTXD=self.traerVentas('TXD')'''
         self.conjuntoPeriodos=self.traerPeriodos()
         self.conjuntoActores=self.traerActores()
-        """self.conjutoDeclaracionesSIG=self.traerDeclaracionesSIG()
+        self.conjutoDeclaracionesSIG=self.traerDeclaracionesSIG()
         self.conjuntoEcotasa=self.traerEcotasa()
         self.conjuntoGrupoEcotasa=self.traerGrupoEcotasa()
         print('Creando conjuntos de elementos')
-        self.conjuntoMaterialidad= self.traerMaterialidad()"""
- 
-        # ===== CREACION RAPIDA =====
-        self.chunk_size = 60
-        self.productosTXD_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosTXD}
-        self.productosMDH_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosMDH}
-        self.productosSMK_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosSMK}
-        self.marcas_fastsearch = { marca['x_name']:marca for marca in self.conjuntoMarcas}
-        self.proveedores_fatsearch = { prov['name']:prov for prov in self.conjuntoProveedores}
-        self.departamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoDepartamentos}
-        self.subdepartamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoSubDepartamentos}
-        self.secciones_fastsearch = {x['x_name']:x for x in self.conjuntoSecciones}
-        self.rubros_fastsearch = {x['x_name']:x for x in self.conjuntoRubro}
-        self.subrubros_fastsearch = {x['x_name']:x for x in self.conjuntoSubRubro}
-        # ===== CREACION RAPIDA =====
- 
+        self.conjuntoMaterialidad= self.traerMaterialidad()
         print('Objeto establecido')
     #BUSCADORES
     def traerPeriodos(self):
@@ -511,7 +451,7 @@ class Odoo:
 
         """
         try:
-            resultadoBusqueda=self.productos.search_read([('x_studio_unidades_de_negocio','=',unidadNegocio)],['x_name','x_studio_sku_unidad_de_negocio','x_studio_pm_asociado','x_studio_cdigo_regional'])
+            resultadoBusqueda=self.productos.search_read([('x_studio_unidades_de_negocio','=',unidadNegocio)],['x_name','x_studio_sku_unidad_de_negocio','x_studio_pm_asociado'])
             return resultadoBusqueda
         except IndexError:
             return None
@@ -787,8 +727,8 @@ class Odoo:
             return None
         pass
 
-    '''
-    antiguo metodo buscarProductoRam
+
+
     def buscarProductoRam(self,skuUnidadNegocio,unidadNegocio):
         """
         Descripción metodo
@@ -806,39 +746,12 @@ class Odoo:
             listaRegistros=self.conjuntoProductosMDH
         elif unidadNegocio=='TXD':
             listaRegistros=self.conjuntoProductosTXD
-
-
-
 
         for fila in range(len(listaRegistros)):
             skuUN=listaRegistros[fila]['x_studio_sku_unidad_de_negocio']
             if skuUN==skuUnidadNegocio:
                 return listaRegistros[fila]['id']
-        return None'''
-    def buscarProductoRam(self,skuUnidadNegocio,unidadNegocio):
-        """
-        Descripción metodo
-
-        Parámetros:
-        parámetro1:
-        parámetro2: 
-
-        Returns: devuelve la id del registro
-
-        """
-        if unidadNegocio=='SMK':
-            listaRegistros=self.conjuntoProductosSMK
-        elif unidadNegocio=='MDH':
-            listaRegistros=self.conjuntoProductosMDH
-        elif unidadNegocio=='TXD':
-            listaRegistros=self.conjuntoProductosTXD
-        
-        #return [sku for sku in listaRegistros if sku['x_studio_sku_unidad_de_negocio']==skuUnidadNegocio]
-        return next((producto['id'] for producto in listaRegistros if producto['x_studio_sku_unidad_de_negocio']==skuUnidadNegocio),None)
-
-
-
-
+        return None
     def buscarProductoRamId(self,idProducto,unidadNegocio):
         """
         Descripción metodo
@@ -860,7 +773,7 @@ class Odoo:
 
         for fila in range(len(listaRegistros)):
             skuUN=listaRegistros[fila]['id']
-            if skuUN==int(idProducto):
+            if skuUN==idProducto:
                 return listaRegistros[fila]['x_studio_sku_unidad_de_negocio']
         return None
     def buscarVentaRam(self,venta):
@@ -913,6 +826,8 @@ class Odoo:
                 return listaRegistros[fila]['id']
         return None
     
+    
+    
     def buscarConjuntoEcotasa(self,idGrupoEcotasa):
         idResultado=self.ecotasa.search([])
         resultadoBusqueda=self.ecotasa.read(idResultado,['create_date',
@@ -922,9 +837,12 @@ class Odoo:
                                             'x_studio_e',
                                             ])
         return resultadoBusqueda
-    '''
-    metodo antiguo
-    def buscarEanRam(self,codEAN,codSku, unidadNegocio=None, NombreProveedor=None):
+
+
+    
+    
+    
+    def buscarEanRam(self,codEAN,codSku, unidadNegocio=None):
         """
         Descripción metodo
 
@@ -939,52 +857,9 @@ class Odoo:
         for fila in range(len(listaRegistros)):
             cEan=listaRegistros[fila]['x_name']
             cSku=listaRegistros[fila]['x_studio_sku'][1]
-            prov=listaRegistros[fila]['x_studio_proveedor'][1]
-            if NombreProveedor!=None:
-                #chequeo proveedor
-                idProveedor=self.buscarProveedorRam(NombreProveedor)
-                #idProveedor = self.buscarProveedor(nuevoProducto.proveedor)         
-                if not idProveedor:
-                    #print("PROVEEDOR no presenta en BD")
-                    prove = Proveedor(NombreProveedor,'','')
-                    idProveedor = self.crearProveedor(prove)
-                    if idProveedor:
-                        if cEan==codEAN and codSku==cSku and prov==NombreProveedor:
-                            return listaRegistros[fila]['id']      
-                else:
-                    if cEan==codEAN and codSku==cSku and prov==NombreProveedor:
-                        return listaRegistros[fila]['id']
-            elif cEan==codEAN and codSku==cSku:
-                return listaRegistros[fila]['id']            
-        return None'''
-
-    def buscarEanRam(self,codEAN,codSku, unidadNegocio=None, NombreProveedor=None):
-        """
-        Descripción metodo
-
-        Parámetros:
-        parámetro1:
-        parámetro2: 
-
-        Returns: devuelve la id del registro
-
-        """
-        listaRegistros=self.conjuntoEan
-        if NombreProveedor==None:
-            return next((ean['id'] for ean in listaRegistros if (ean['x_name']==codEAN and ean['x_studio_sku'][1]==codSku)),None)
-        else:
-            idProveedor=self.buscarProveedorRam(NombreProveedor)
-            #idProveedor = self.buscarProveedor(nuevoProducto.proveedor)         
-            if not idProveedor:
-                #print("PROVEEDOR no presenta en BD")
-                prove = Proveedor(NombreProveedor,'','')
-                idProveedor = self.crearProveedor(prove)
-                if idProveedor:
-                    return next((ean['id'] for ean in listaRegistros if ean['x_name']==codEAN and ean['x_studio_sku'][1]==codSku and ean['x_studio_proveedor'][1]==NombreProveedor),None)
-            else:
-                return next((ean['id'] for ean in listaRegistros if ean['x_name']==codEAN and ean['x_studio_sku'][1]==codSku),None)
-
-    
+            if cEan==codEAN and codSku==cSku:
+                return listaRegistros[fila]['id']
+        return None
     def buscarEanRamId(self,idEAN, unidadNegocio=None):
         """
         Descripción metodo
@@ -1013,9 +888,12 @@ class Odoo:
         Returns: devuelve la id del registro
 
         """
-
-        if nombreProveedor!=None:
-            return next((proveedor['id'] for proveedor in self.conjuntoProveedores if (proveedor['name']==nombreProveedor)),None)
+        listaregistros=self.conjuntoProveedores
+        for fila in range(len(listaregistros)):
+            nProveedor=listaregistros[fila]['name']
+            if nProveedor==nombreProveedor:
+                return listaregistros[fila]['id']
+        return None
     def buscarProveedorRamId(self,idProveedor):
         """
         Descripción metodo
@@ -1128,6 +1006,10 @@ class Odoo:
                 return listaregistros[fila]
         return None
 
+
+
+
+
     def buscarProductos(self,codProducto,unidadNegocio):
         """
         busca un producto en la base de datos
@@ -1209,32 +1091,7 @@ class Odoo:
             if conjPeriodo[fila]['x_name']==periodo:
                 return conjPeriodo[fila]['id']
         return None
-    def buscarCodRegionalSKU(self,idSKU,unidadNegocio):
-        """
-        Descripción metodo
 
-        Parámetros:
-        parámetro1:
-        parámetro2: 
-
-        Returns: devuelve la id del registro
-
-        """
-        if unidadNegocio=='SMK':
-            listaregistros=self.conjuntoProductosSMK
-        elif unidadNegocio=='MDH':
-            listaregistros=self.conjuntoProductosMDH
-        elif unidadNegocio=='TXD':
-            listaregistros=self.conjuntoProductosTXD
-        for fila in range(len(listaregistros)):
-            idSKULista=listaregistros[fila]['id']
-            if idSKULista==idSKU:
-                try:
-                    return listaregistros[fila]['x_studio_cdigo_regional']
-                except KeyError:
-                    return None
-        return None
-        
     def buscarMarca(self,nombreMarca):
         """
         hace la búsqueda de la marca
@@ -1392,7 +1249,7 @@ class Odoo:
                 'name' : nuevoProveedor.nombre,
                 'email' : nuevoProveedor.correo,
                 'x_studio_proveedor' : 1,
-                'vat' : str(nuevoProveedor.codProveedor),
+                'vat' : nuevoProveedor.codProveedor
             })
             self.conjuntoProveedores.append({'id': proveedorCreado, 'name': nuevoProveedor.nombre, 'email': nuevoProveedor.correo})
             return proveedorCreado
@@ -1527,10 +1384,10 @@ class Odoo:
             #idActor = self.crearActorRelevante(actor)
             unidadesNeg =[]
             origen=nuevoProducto.origen
-            if nuevoProducto.origen=='IMPORTADOS' or nuevoProducto.origen=='Importado':
+            if nuevoProducto.origen=='IMPORTADOS':
                 origen='IMPORTADO'
-            elif nuevoProducto.origen=='NACIONALES' or nuevoProducto.origen=='Nacional':
-                origen='NACIONAL'
+            elif nuevoProducto.origen=='NACIONALES':
+                origen='IMPORTADO'
             if nuevoProducto.unidadNegocio=="SMK":
                 unidadesNeg.append(1)
                 productoCreado = self.productos.create({
@@ -1549,8 +1406,7 @@ class Odoo:
                     'x_studio_marca' : marca,
                     'x_studio_proveedor': idProveedor,
                     #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_smk':1,
+                    'x_studio_stage_id' : 2
                 })
                 self.conjuntoProductosSMK.append({'id': productoCreado, 'x_name': str(nuevoProducto.sku)+nuevoProducto.unidadNegocio, 'x_studio_sku_unidad_de_negocio': str(nuevoProducto.sku)})
             elif nuevoProducto.unidadNegocio=="MDH":
@@ -1568,12 +1424,11 @@ class Odoo:
                     #'x_studio_grupo': idcategoria3,
                     'x_studio_cdigo_referencia_proveedor' : nuevoProducto.codRefProveedor,
                     'x_studio_descripcin': nuevoProducto.descripcion,
-                    'x_studio_origen' : origen,
+                    'x_studio_origen' : nuevoProducto.origen,
                     'x_studio_marca' : marca,
-                    'x_studio_proveedor': idProveedor,
+                    #'x_studio_proveedor': idProveedor,
                     #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_mdh':1,
+                    'x_studio_stage_id' : 2
                 })
                 self.conjuntoProductosMDH.append({'id': productoCreado, 'x_name': str(nuevoProducto.sku)+nuevoProducto.unidadNegocio, 'x_studio_sku_unidad_de_negocio': str(nuevoProducto.sku)})
             elif nuevoProducto.unidadNegocio=="TXD":
@@ -1593,15 +1448,10 @@ class Odoo:
                     'x_studio_marca' : marca,
                     #'x_studio_proveedor': idProveedor,
                     #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_txd':1,
+                    'x_studio_stage_id' : 2
                 })
                 self.conjuntoProductosTXD.append({'id': productoCreado, 'x_name': str(nuevoProducto.sku)+nuevoProducto.unidadNegocio, 'x_studio_sku_unidad_de_negocio': str(nuevoProducto.sku)})
-            if nuevoProducto.ean:
-                self.crearEan(Ean(str(nuevoProducto.ean),productoCreado,idProveedor),nuevoProducto.unidadNegocio)
-            return productoCreado
-        return resultadoBusqueda
-
+            self.crearEan(Ean(str(nuevoProducto.ean),productoCreado,idProveedor),nuevoProducto.unidadNegocio)
     def crearProductoVentaSMK(self,nuevoProducto):
         """
         crea un producto
@@ -1794,17 +1644,16 @@ class Odoo:
                 'x_studio_periodo':idPeriodo,
                 'x_studio_mes':venta.mes,
                 'x_studio_producto':idProducto,
-                'x_studio_ventaprecencialjumbo':int(venta.ventaPrecencialJumbo),
-                'x_studio_ventaecommercejumbo':int(venta.ventaEcommerceJumbo),
-                'x_studio_ventaprecencialconv':int(venta.ventaPrecencialConv),
-                'x_studio_ventaecommerceconv':int(venta.ventaEcommerceConv),
-                'x_studio_ventaprecencialsisa':int(venta.ventaPrecencialSisa),
-                'x_studio_ventaecommercesisa':int(venta.ventaEcommerceSisa),
-                'x_studio_ventaprecencialeasy':int(venta.ventaPrecencialEasy),
-                'x_studio_ventainterneteasy':int(venta.ventaInternetEasy),
-                'x_studio_ventamayoristaeasy':int(venta.ventaMayoristaEasy),
-                'x_studio_ventaprecencialparis':int(venta.ventaPrecencialParis),
-                'x_studio_ventainternetparis':int(venta.ventaEcommerceParis),
+                'x_studio_ventaprecencialjumbo':venta.ventaPrecencialJumbo,
+                'x_studio_ventaecommercejumbo':venta.ventaEcommerceJumbo,
+                'x_studio_ventaprecencialconv':venta.ventaPrecencialConv,
+                'x_studio_ventaecommerceconv':venta.ventaEcommerceConv,
+                'x_studio_ventaprecencialsisa':venta.ventaPrecencialSisa,
+                'x_studio_ventaecommercesisa':venta.ventaEcommerceSisa,
+                'x_studio_ventaprecencialeasy':venta.ventaPrecencialEasy,
+                'x_studio_ventainterneteasy':venta.ventaInternetEasy,
+                'x_studio_ventamayoristaeasy':venta.ventaMayoristaEasy,
+                'x_studio_ventaprecencialparis':venta.ventaPrecencialParis,
             })
             if venta.unidadNegocio=='SMK':
                 conjuntoVentas=self.conjuntoVentasSMK
@@ -1831,21 +1680,18 @@ class Odoo:
                 'x_studio_ventainterneteasy':venta.ventaInternetEasy,
                 'x_studio_ventamayoristaeasy':venta.ventaMayoristaEasy,
                 'x_studio_ventaprecencialparis':venta.ventaPrecencialParis,            
-            })
+            })      
     def crearEan(self,objEan,unidadNegocio):
         idSKU=objEan.idSku
-        codSKU=str(self.buscarProductoRamId(idSKU,unidadNegocio))+unidadNegocio
         idProveedor=objEan.idProveedor
-        nombreProveedor=self.buscarProveedorRamId(int(idProveedor))
-        idEAN=self.buscarEanRam(str(objEan.codEAN),str(codSKU))
+        idEAN=self.buscarEanRam(str(objEan.codEAN),str(self.buscarProductoRamId(idSKU,unidadNegocio))+unidadNegocio)
         if not idEAN:
             idEAN = self.ean.create({
                 'x_name':str(objEan.codEAN),
-                'x_studio_sku':int(idSKU),
-                'x_studio_proveedor':int(idProveedor)
+                'x_studio_sku':idSKU,
+                'x_studio_proveedor':idProveedor
             })
-            time.sleep(0.005)
-            self.conjuntoEan.append({'id': idEAN, 'x_name': str(objEan.codEAN), 'x_studio_sku': [idSKU, codSKU], 'x_studio_proveedor': [idProveedor, self.buscarProveedorRamId(idProveedor)]})
+        self.conjuntoEan.append({'id': idEAN, 'x_name': str(objEan.codEAN), 'x_studio_sku': [idSKU, self.buscarProductoRamId(idSKU,unidadNegocio)], 'x_studio_proveedor': [idProveedor, self.buscarProveedorRamId(idProveedor)]})
         return idEAN
     def crearDepartamento(self,nombreDepartamento):
         idDepartamento=self.buscarCategoriaRam(self.conjuntoDepartamentos,nombreDepartamento)
@@ -2039,7 +1885,7 @@ class Odoo:
                             '',
                             '',
                             )
-                        busquedaSKU=self.crearProducto(prod)
+                        idSKU=self.crearProducto(prod)
                     elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'SMK'):
                         idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
 
@@ -2100,7 +1946,7 @@ class Odoo:
                                 str(skuProducto),
                                 '',
                                 '',
-                                df.loc[fila]['Item_Desc'],
+                                '',
                                 '',
                                 '',
                                 '',
@@ -2247,104 +2093,6 @@ class Odoo:
 
             print('Dataframe de insumos procesado en un 100%')
             return 1
-        elif dataframe.tipo=='categoria_SM':
-            print('iniciando proceso categoria SMK')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            df.columns=['vacio1','vacio2','Sku','Cod_regional','Ean','Descripcion','Departamento','Categoria','Sub_Categoria','clase','Tipo_Marca','Origen','Proveedor']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de categorias procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de categorias procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de categorias procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    skuProducto=df.loc[fila]['Sku']
-                    eanProducto=df.loc[fila]['Ean']
-                    busquedaSKU=self.buscarProductoRam(str(skuProducto),'SMK')
-                    if not busquedaSKU:
-                        prod= Producto(
-                            'SMK',
-                            skuProducto,
-                            eanProducto,
-                            '',
-                            df.loc[fila]['Proveedor'],
-                            df.loc[fila]['Descripcion'],
-                            df.loc[fila]['Origen'],
-                            df.loc[fila]['Tipo_Marca'],
-                            'No completado - Nuevo',
-                            df.loc[fila]['Departamento'],
-                            df.loc[fila]['Categoria'],
-                            df.loc[fila]['Sub_Categoria'],
-                            codRegional=df.loc[fila]['Cod_regional'],
-                            )
-                        busquedaSKU=self.crearProducto(prod)
-
-                    elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'SMK'):
-                        idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
-                        if idProveedor:
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
-                        else:
-                            idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],'',''))
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(self.buscarProductoRam(str(skuProducto),'SMK')),str(idProveedorCreado))
-                        self.crearEan(objEan,'SMK')
-                else:
-                    return 0                
-            print('Dataframe de categorias procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='proveedor_SM':
-            print('iniciando proceso proveedor SMK')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            df.columns=['RUT','nombre','correo']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de proveedores procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de proveedores procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de proveedores procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    rutProveedor=df.loc[fila]['RUT']
-                    nombre=df.loc[fila]['nombre']
-                    correo=df.loc[fila]['correo']
-                    busquedaProveedor=self.buscarProveedorRam(df.loc[fila]['nombre'])
-                    if not busquedaProveedor:
-                        prod= Proveedor(
-                            df.loc[fila]['nombre'],
-                            df.loc[fila]['RUT'],
-                            df.loc[fila]['correo'],
-                            )
-                        busquedaProveedor=self.crearProveedor(prod)
-
-                    else:
-                        self.proveedor.write(busquedaProveedor,{
-                            'vat': df.loc[fila]['RUT'],
-                            'email': df.loc[fila]['correo'],
-                            })
-                else:
-                    return 0                
-            print('Dataframe de proveedores procesado en un 100%')
-            return 1
     def revisarDF_MDH(self,dataframe,tempo):
         if dataframe.tipo=='producto_MDH':
             print('iniciando proceso productos MDH')
@@ -2425,19 +2173,16 @@ class Odoo:
                     if fila>(largo*3)/4 and avance75:
                         print('Dataframe procesado en un 75%')
                         avance75=0
-                    df['Cantidad_Presencial']=df['Cantidad_Presencial'].astype('float64')
-                    df['Cantidad_Presencial']=df['Cantidad_Presencial'].astype('float64')
-                    df['Cantidad_Presencial']=df['Cantidad_Presencial'].astype('float64')
                     #print(datoFila['Sku'])
                     easyPresencial=0
                     easyInternet=0
                     easyMayorista=0
                     if df.loc[fila]['Cantidad_Presencial']>0:
                         easyPresencial=df.loc[fila]['Cantidad_Presencial']
-                    if df.loc[fila]['Cantidad_Internet']>0:
-                        easyInternet=df.loc[fila]['Cantidad_Internet']
-                    if df.loc[fila]['Cantidad_Mayorista']>0:
-                        easyMayorista=df.loc[fila]['Cantidad_Mayorista']
+                    if df.loc[fila]['Cantidad_Presencial']>0:
+                        easyInternet=df.loc[fila]['Cantidad_Presencial']
+                    if df.loc[fila]['Cantidad_Presencial']>0:
+                        easyMayorista=df.loc[fila]['Cantidad_Presencial']
                     if (easyPresencial+easyInternet+easyMayorista)>0:
                         idSku=self.buscarProductoRam(str(df.loc[fila]['Articulo']),'MDH')
                         if not idSku:
@@ -2498,138 +2243,20 @@ class Odoo:
                                 0,
                             )
                             self.crearVenta(venta)
-
-                        if not self.buscarEanRam(str(df.loc[fila]['Ean']),str(df.loc[fila]['Articulo'])+'MDH',NombreProveedor=df.loc[fila]['Nombre_Proveedor']):
-                            idProveedor=self.buscarProveedorRam(df.loc[fila]['Nombre_Proveedor'])
-                            if idProveedor:
-                                objEan = Ean(str(df.loc[fila]['Ean']),idSku,str(idProveedor))
-                            else:
-                                idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],'',''))
-                                objEan = Ean(str(df.loc[fila]['Ean']),idSku,str(idProveedorCreado))
-                            self.crearEan(objEan,'MDH')
-
-
-
                 else:
                     return 0
             print('Dataframe procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='categoria_MDH':
-            print('iniciando proceso categoria MDH')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            [1,2,3,4,]
-            df.columns=['Sku','Cod_regional','Ean','Descripcion','Departamento','Categoria','Sub_Categoria','clase','Tipo_Marca','Origen','Proveedor']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de categorias procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de categorias procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de categorias procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    skuProducto=df.loc[fila]['Sku']
-                    eanProducto=df.loc[fila]['Ean']
-                    busquedaSKU=self.buscarProductoRam(str(skuProducto),'MDH')
-                    if not busquedaSKU:
-                        prod= Producto(
-                            'MDH',
-                            skuProducto,
-                            eanProducto,
-                            '',
-                            df.loc[fila]['Proveedor'],
-                            df.loc[fila]['Descripcion'],
-                            df.loc[fila]['Origen'],
-                            df.loc[fila]['Tipo_Marca'],
-                            'No completado - Nuevo',
-                            df.loc[fila]['Departamento'],
-                            df.loc[fila]['Categoria'],
-                            df.loc[fila]['Sub_Categoria'],
-                            codRegional=df.loc[fila]['Cod_regional'],
-                            )
-                        busquedaSKU=self.crearProducto(prod)
-                    
-                    elif not self.buscarCodRegionalSKU(busquedaSKU,'MDH'):
-                        self.productos.write(busquedaSKU,{
-                            'x_studio_cdigo_regional': df.loc[fila]['Cod_regional'],
-                            })
-
-                    elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'MDH',NombreProveedor=df.loc[fila]['Proveedor']):
-                        idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
-                        if idProveedor:
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
-                        else:
-                            idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],'',''))
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedorCreado))
-                        self.crearEan(objEan,'MDH')
-                else:
-                    return 0                
-            print('Dataframe de categorias procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='proveedor_MDH':
-            print('iniciando proceso proveedor MDH')
-            #fila=0
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            #df.columns=['RUT','nombre','correo']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de proveedores procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de proveedores procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de proveedores procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    nombre=df.loc[fila][1]
-                    busquedaProveedor=self.buscarProveedorRam(df.loc[fila][1])
-                    if not busquedaProveedor:
-                        prod= Proveedor(
-                            df.loc[fila][1],
-                            df.loc[fila][0],
-                            df.loc[fila][2],
-                            )
-                        busquedaProveedor=self.crearProveedor(prod)
-
-                    else:
-                        self.proveedor.write(busquedaProveedor,{
-                            'vat': str(df.loc[fila][0]),
-                            'email': str(df.loc[fila][2]),
-                            })
-                else:
-                    return 0                
-            print('Dataframe de proveedores procesado en un 100%')
             return 1
 
     def revisarDF_TXD(self,dataframe,tempo):
         if dataframe.tipo=='producto_TXD':
             fila=1
             df=dataframe.dataFrame
-            df.replace({'-':0},inplace=True)
-            
-            df['PARIS.CL']=df['PARIS.CL'].astype(int)
-            df['TIENDAS PRESCENCIALES']=df['TIENDAS PRESCENCIALES'].astype(int)
-            pt=self.generarDFtxd(df)
-            largo=len(pt)
+            largo=len(df)
             avance25=1
             avance50=1
             avance75=1
-            for fila in range(len(pt)):
+            for fila in range(len(df)):
                 if tempo.verificarTiempoLimite(time.time()):
                     if fila>largo/4 and avance25:
                         print('Dataframe procesado en un 25%')
@@ -2640,28 +2267,26 @@ class Odoo:
                     if fila>(largo*3)/4 and avance75:
                         print('Dataframe procesado en un 75%')
                         avance75=0
-
+                
                     #print(datoFila['Sku'])
-                    skuProducto=pt.index[fila][1]
-                    yearVenta = procesarFecha(pt.index[fila][0])[0]
-                    mesVenta = int(procesarFecha(pt.index[fila][0])[1])
-
-                    ecoParis=0
-                    ecoParis=0
-
-                    if pt.values[fila][1] > 0:
-                        presParis = pt.values[fila][1]
-                    else:
-                        presParis = 0
-                    if pt.values[fila][0] > 0:
-                        ecoParis = pt.values[fila][0]
-                    else:
-                        ecoParis = 0
+                    skuProducto=df.loc[fila]['ID JERARQUIA']
+                    presParis = 0
+                    ecoParis = 0
+    
+                    if df.loc[fila]['TIENDAS PRESCENCIALES'] != '-':
+                        if int(float(df.loc[fila]['TIENDAS PRESCENCIALES'])) > 0:
+                            presParis = int(float(df.loc[fila]['TIENDAS PRESCENCIALES']))
+                    if df.loc[fila]['PARIS.CL'] != '-':        
+                        if int(float(df.loc[fila]['PARIS.CL'])) > 0:
+                            ecoParis = int(float(df.loc[fila]['PARIS.CL']))    
                     if(presParis+ecoParis)>0:
                         #eanProducto=df.loc[fila]['Ean']
                         busquedaSKU=self.buscarProductoRam(str(skuProducto),'TXD')
                         origen=''
-
+                        if df.loc[fila]['ORIGIN TYPE']== 'NAC':
+                            origen = 'NACIONAL'
+                        elif df.loc[fila]['ORIGIN TYPE']== 'IMP':
+                            origen = 'IMPORTADO'
                         if not busquedaSKU:
                             prod= Producto(
                                 'TXD',
@@ -2669,12 +2294,12 @@ class Odoo:
                                 '',
                                 '',
                                 '',
-                                pt.index[fila][4],#['CLASS DESC'],
-                                '',
-                                '',
+                                df.loc[fila]['CLASS DESC'],
+                                origen,
+                                df.loc[fila]['BRAND'],
                                 'No completado - Nuevo',
-                                pt.index[fila][2],#['DEPT'],
-                                pt.index[fila][3],#['SUB DEPT'],
+                                df.loc[fila]['DEPT'],
+                                df.loc[fila]['SUB DEPT'],
                                 '',
                                 '',
                                 '',
@@ -2683,8 +2308,8 @@ class Odoo:
                                 )
                             idSku=self.crearProducto(prod)
                         ventaAcrear = Venta(
-                            yearVenta,
-                            mesVenta,
+                            '2022',
+                            12,
                             str(skuProducto),
                             'TXD',
                             0,
@@ -2696,19 +2321,24 @@ class Odoo:
                             0,
                             0,
                             0,
-                            int(presParis),
-                            int(ecoParis),
+                            presParis,
+                            ecoParis
                         )
                     self.crearVenta(ventaAcrear)
+
+                    #elif not self.buscarEanRam(str(eanProducto)):
+                    #    idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
+
+                    #    if idProveedor:
+                    #        objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
+                    #    else:
+                    #        idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],df.loc[fila]['Cod_Refer_Proveedor'],''))
+                    #        objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedorCreado))
+                    #    self.crearEan(objEan,'MDH')
                 else:
                     return 0
             print('Dataframe procesado en un 100%')
             return 1
-
-    def generarDFtxd(self,dataframeAnterior):
-        pt=pd.pivot_table(dataframeAnterior,values=['PARIS.CL','TIENDAS PRESCENCIALES'],index=['Mes de Proceso','ID JERARQUIA','DEPT','SUB DEPT','CLASS DESC'], aggfunc={'PARIS.CL':np.sum,'TIENDAS PRESCENCIALES':np.sum,})
-        print(pt)
-        return pt
 
     def procesarDF(self,dataFrame,aws,tempo):
         if dataFrame.unidadNegocio=='SMK':
@@ -2886,1107 +2516,10 @@ class Odoo:
                 return 1'''
         return 0
 
-    # ===== CREACION RAPIDA =====
-    def procesarDF_multiple(self,dataFrame,aws,tempo):
-        """
-        Metodo principal llamado para realizar el proceso de integracion cenco.
-        Se recive un csv y lo redirige al metodo de la unidad de negocio correspondiente.
-
-        Parámetros: 
-        dataFrame: Objeto dataFrame con los datos (ventas, productos, proveedores, insumos, etc...)
-        aws: Objeto aws.
-        tempo: Temporizador usado para botar el proceso si es que se agota el tiempo 
-
-        Returns: Ninguno
-
-        """
-        if dataFrame.unidadNegocio=='SMK':
-            print('iniciando proceso SMK')
-            if self.revisarDF_SMK_multiple(dataFrame,tempo)==1:
-                return
-                aws.cambiarDocumentoFolder(dataFrame.nombrebucket,dataFrame.keyobj,'SMKPROCESADOS/','SMK')
-                self.crearRegistroDF(RegistroDF(dataFrame.keyobj,1,dataFrame.tipo))
-            return
-        elif dataFrame.unidadNegocio=='MDH':
-            print('iniciando proceso MDH')
-            if self.revisarDF_MDH_multiple(dataFrame,tempo)==1:
-                return
-                aws.cambiarDocumentoFolder(dataFrame.nombrebucket,dataFrame.keyobj,'MDHPROCESADOS/','MDH')
-                self.crearRegistroDF(RegistroDF(dataFrame.keyobj,2,dataFrame.tipo))
-            return
-        elif dataFrame.unidadNegocio=='TXD':
-            print('iniciando proceso TXD')
-            if self.revisarDF_TXD_multiple(dataFrame,tempo)==1:
-                return
-                # aws.cambiarDocumentoFolder(dataFrame.nombrebucket,dataFrame.keyobj,'TXDPROCESADOS/','TXD')
-                # self.crearRegistroDF(RegistroDF(dataFrame.keyobj,3,dataFrame.tipo))
-            return
-        else:
-            return
-
-    def buscarProductoRam_fast(self,x_studio_sku_unidad_de_negocio,unidadNegocio): 
-        """
-        Busca un producto almacenado en memoria.
-
-        Parámetros:
-        x_studio_sku_unidad_de_negocio: sku_unidad de negocio del producto 
-        unidadNegocio: Unidad de negocio (SMK,MDH o TXD)
-
-        Returns: Devuelve la id del producto o None
-
-        """
-        if unidadNegocio=='SMK':
-            listaRegistros=self.productosSMK_fastsearch
-        elif unidadNegocio=='MDH':
-            listaRegistros=self.productosMDH_fastsearch
-        elif unidadNegocio=='TXD':
-            listaRegistros=self.productosTXD_fastsearch
-        
-        if x_studio_sku_unidad_de_negocio in listaRegistros:
-            return listaRegistros[x_studio_sku_unidad_de_negocio]['id']
-        return None
-
-    def buscarProveedorRam_fast(self,nombreProveedor): 
-        """
-        Busca un provedor almacenado en memoria
-
-        Parámetros:
-        nombreProveedor: Nombre del proveedor
-
-        Returns: devuelve la id del registro
-
-        """
-        if nombreProveedor!=None:
-            return next((proveedor['id'] for proveedor in self.conjuntoProveedores if (proveedor['name']==nombreProveedor)),None)
-
-    def buscarCategoriaRam_fast(self,listaregistros,nombreCategoria): 
-        """
-        Busca una categoria almacenada en memoria. Necesita recibir cual lista se utilizara para realizar la busqueda
-        ya que hay muchas listas categorias paran las distintas unidades de negocio.
-
-        Parámetros:
-        listaregistros: Lista en la cual se va a buscar un elemento. Nota: Utilizar las listas denomidas "fastsearch"
-        nombreCategoria: Nombre de la categoria a buscar.
-
-        Returns: devuelve la id del registro
-
-        """
-        if nombreCategoria in listaregistros:
-            return listaregistros[nombreCategoria]['id']
-        return None
-
-    def buscarMarcaRam_fast(self,nombreMarca): 
-        """
-        Busca una marca almacenada en memoria
-
-        Parámetros:
-        nombreMarca: Nombre de la marca a buscar
-
-        Returns: devuelve la id del registro
-
-        """
-        listaregistros=self.marcas_fastsearch
-        if nombreMarca in listaregistros:
-            return listaregistros[nombreMarca]['id']
-        return None
-
-    def crearProveedor_multiple(self,lista_proveedores):
-        """
-        Crea varios proveedores al mismo tiempo
-
-        Parámetros: 
-        lista_proveedores: Lista con nombres de los proveedores. Los nombres de los proveedores son strings.
-
-        Returns: No hay returns, pero los nuevos proveedores se actualizan y quedan guardados en la ram.
-
-        """
-        lista_proveedores = list(set(lista_proveedores))
-        listado_proveedores_crear = [{'name':prov.nombre,'email':prov.correo,'x_studio_proveedor':1,'vat':prov.codProveedor} for prov in lista_proveedores]
-        new_ids = self.proveedor.create(listado_proveedores_crear)
-        listado_proveedores_creados = [{'id':x[0], 'name':x[1].nombre, 'email':x[1].correo} for x in zip(new_ids,lista_proveedores)]
-        self.conjuntoProveedores = self.conjuntoProveedores + listado_proveedores_creados
-        self.proveedores_fatsearch = { prov['name']:prov for prov in self.conjuntoProveedores}
-
-    def crearMarcaMultiple(self,lista_marcas):
-        """
-        Crea varias marcas al mismo tiempo.
-
-        Parámetros:
-        lista_marcas: Lista con los nombres de las marcas a probar. Los nombres de las marcas son str.
-
-        Returns: No hay returns pero las nuevas marcas se actualizan y quedan guardas en ram
-
-        """
-        lista_marcas = list(set(lista_marcas))
-        listado_marcas_crear = [{'x_name':name_marca} for name_marca in lista_marcas]
-        new_ids = self.marca.create(listado_marcas_crear)
-        listado_marcas_creadas = [{'id': x[0], 'x_name': x[1]} for x in zip(new_ids,lista_marcas)]
-        self.conjuntoMarcas = self.conjuntoMarcas + listado_marcas_creadas
-        self.marcas_fastsearch = { marca['x_name']:marca for marca in self.conjuntoMarcas}
-
-    def crearVentas_multiple(self,lista_ventas):
-        """
-        Se crean varias ventas al mismo tiempo
-
-        Parámetros:
-        lista_ventas: Lista con las ventas a crear. Las ventas son objetos de la clase Venta 
-
-        Returns: No hay return pero las nuevas ventas se actualizan y quedan guardadas en memoria.
-
-        """
-        lista_ventas_crear = []
-        for venta in lista_ventas:
-            idPeriodo=self.buscarPeriodoRam(str(venta.periodo))
-            idProducto=self.buscarProductoRam_fast(venta.producto,venta.unidadNegocio)
-            lista_ventas_crear.append({
-                'x_studio_periodo':idPeriodo,
-                'x_studio_mes':venta.mes,
-                'x_studio_producto':idProducto,
-                'x_studio_ventaprecencialjumbo':int(venta.ventaPrecencialJumbo),
-                'x_studio_ventaecommercejumbo':int(venta.ventaEcommerceJumbo),
-                'x_studio_ventaprecencialconv':int(venta.ventaPrecencialConv),
-                'x_studio_ventaecommerceconv':int(venta.ventaEcommerceConv),
-                'x_studio_ventaprecencialsisa':int(venta.ventaPrecencialSisa),
-                'x_studio_ventaecommercesisa':int(venta.ventaEcommerceSisa),
-                'x_studio_ventaprecencialeasy':int(venta.ventaPrecencialEasy),
-                'x_studio_ventainterneteasy':int(venta.ventaInternetEasy),
-                'x_studio_ventamayoristaeasy':int(venta.ventaMayoristaEasy),
-                'x_studio_ventaprecencialparis':int(venta.ventaPrecencialParis),
-                'x_studio_ventainternetparis':int(venta.ventaEcommerceParis),
-            })
-        new_ids = self.ventas.create(lista_ventas_crear)
-
-        for x in zip(new_ids,lista_ventas,):
-            new_id = x[0]
-            venta = x[1]
-            if venta.unidadNegocio=='SMK':
-                conjuntoVentas = self.conjuntoVentasSMK
-                un = 1
-            elif venta.unidadNegocio=='MDH':
-                conjuntoVentas = self.conjuntoVentasMDH
-                un = 2
-            elif venta .unidadNegocio=='TXD':
-                conjuntoVentas = self.conjuntoVentasTXD
-                un = 3
-
-            idPeriodo=self.buscarPeriodoRam(venta.periodo)
-            conjuntoVentas.append({
-                'id': new_id,
-                'x_studio_periodo':[idPeriodo,venta.periodo],
-                'x_studio_mes':venta.mes,
-                'x_studio_producto': [self.buscarProductoRam(venta.producto,venta.unidadNegocio), str(venta.producto) + venta.unidadNegocio],
-                'x_studio_unidades_de_negocio':[un],
-                'x_studio_ventaprecencialjumbo':venta.ventaPrecencialJumbo,
-                'x_studio_ventaecommercejumbo':venta.ventaEcommerceJumbo,
-                'x_studio_ventaprecencialconv':venta.ventaPrecencialConv,
-                'x_studio_ventaecommerceconv':venta.ventaEcommerceConv,
-                'x_studio_ventaprecencialsisa':venta.ventaPrecencialSisa,
-                'x_studio_ventaecommercesisa':venta.ventaEcommerceSisa,
-                'x_studio_ventaprecencialeasy':venta.ventaPrecencialEasy,
-                'x_studio_ventainterneteasy':venta.ventaInternetEasy,
-                'x_studio_ventamayoristaeasy':venta.ventaMayoristaEasy,
-                'x_studio_ventaprecencialparis':venta.ventaPrecencialParis,            
-            })
-
-    def crearProductos_multiple(self,lista_productos,unidad_negocio):   
-        """
-        Crea varios productos al mismo tiempo. Todos los productos deben pertenecer a la misma unidad de negocio.
-
-        Parámetros:
-        lista_productos: Lista de productos a crear. Los productos son obtejos de la clase Producto
-        unidad_negocio: Nombre de la unidad de negocio (SMK,MDH,TXD)
-
-        Returns: No hay return, pero los nuevos productos se actualizan en memoria y se guardan en la ram.
-
-        """
-        listado_productos_crear = []
-        for prod in lista_productos:
-            if prod.unidadNegocio != unidad_negocio:
-                raise Exception(f'Error: La unidad de negocio del producto {prod.unidadNegocio} no coincide con {unidad_negocio}')
-
-            # BUSCAR MARCA
-            try:
-                marca = self.buscarMarcaRam_fast(prod.marca)
-            except:
-                raise Exception('Error, no se encuentra la marca',prod.marca)
-
-            # BUSCAR PROV
-            try:
-                idProveedor=self.buscarProveedorRam_fast(prod.proveedor)
-            except:
-                raise Exception('Error, no existe el idProveedor para',prod.proveedor)
-
-            # CREAR CATEGORIAS
-            if unidad_negocio=='TXD':
-                idcategoria1=self.buscarCategoriaRam_fast(self.departamentos_fastseach,prod.categoria1)
-                if not idcategoria1:
-                    idcategoria1 = self.crearDepartamento(prod.categoria1)
-
-                idcategoria2=self.buscarCategoriaRam_fast(self.subdepartamentos_fastseach,prod.categoria2)
-                if not idcategoria2:
-                    idcategoria2 = self.crearSubDepartamento(prod.categoria2)
-            
-            elif unidad_negocio == 'MDH':
-                idcategoria1=self.buscarCategoriaRam_fast(self.secciones_fastsearch,prod.categoria1)
-                if not idcategoria1:
-                    idcategoria1 = self.crearSeccion(prod.categoria1)
-                
-                idcategoria2=self.buscarCategoriaRam_fast(self.rubros_fastsearch,prod.categoria2)
-                if not idcategoria2:
-                    idcategoria2 = self.crearRubro(prod.categoria2)
-
-                idcategoria3=self.buscarCategoriaRam_fast(self.subrubros_fastsearch,prod.categoria2)
-                if not idcategoria3:
-                    idcategoria3 = self.crearSubRubro(prod.categoria3)
-
-            elif unidad_negocio == 'SMK':
-                idcategoria1=self.buscarCategoriaRam_fast(self.departamentos_fastseach,prod.categoria1)
-                if not idcategoria1:
-                    idcategoria1 = self.crearDepartamento(prod.categoria1)
-                
-                idcategoria2=self.buscarCategoriaRam_fast(self.subdepartamentos_fastseach,prod.categoria2)
-                if not idcategoria2:
-                    idcategoria2 = self.crearSubDepartamento(prod.categoria2)
-
-                idcategoria3=self.buscarCategoriaRam_fast(self.categorias_fastsearch,prod.categoria3)
-                if not idcategoria3:
-                    idcategoria3 = self.crearCategoria(prod.categoria3)
-
-
-            # PROCESAR ORIGEN
-            origen=prod.origen
-            if prod.origen=='IMPORTADOS' or prod.origen=='Importado':
-                origen='IMPORTADO'
-            elif prod.origen=='NACIONALES' or prod.origen=='Nacional':
-                origen='NACIONAL'
-
-            # GENERAR JSON ENVIABLE
-            if prod.unidadNegocio == 'TXD':
-                listado_productos_crear.append({
-                    'x_studio_unidades_de_negocio' : [3],
-                    'x_name' : str(prod.sku)+prod.unidadNegocio,
-                    'x_studio_sku_unidad_de_negocio':str(prod.sku),
-                    #'x_studio_ean_asociados': '',
-                    #'x_studio_ean' : nuevoProducto.ean,
-                    'x_studio_cdigo_regional' : prod.codRegional,
-                    'x_studio_departamento_txd': idcategoria1,
-                    'x_studio_subdepartamento_txd': idcategoria2,
-                    'x_studio_cdigo_referencia_proveedor' : prod.codRefProveedor,
-                    'x_studio_descripcin': prod.descripcion,
-                    'x_studio_origen' : origen,
-                    'x_studio_marca' : marca,
-                    'x_studio_proveedor': idProveedor,
-                    #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_txd':1,
-                })
-            elif prod.unidadNegocio == 'MDH':
-                listado_productos_crear.append({
-                    'x_studio_unidades_de_negocio' : [2],
-                    'x_name' : str(prod.sku)+prod.unidadNegocio,
-                    'x_studio_sku_unidad_de_negocio':str(prod.sku),
-                    #'x_studio_ean_asociados': '',
-                    #'x_studio_ean' : nuevoProducto.ean,
-                    'x_studio_cdigo_regional' : prod.codRegional,
-                    'x_studio_seccion': idcategoria1,
-                    'x_studio_rubro': idcategoria2,
-                    'x_studio_subrubro': idcategoria3,
-                    #'x_studio_grupo': idcategoria3,
-                    'x_studio_cdigo_referencia_proveedor' : prod.codRefProveedor,
-                    'x_studio_descripcin': prod.descripcion,
-                    'x_studio_origen' : origen,
-                    'x_studio_marca' : marca,
-                    'x_studio_proveedor': idProveedor,
-                    #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_mdh':1,
-                })
-            elif unidad_negocio == 'SMK':
-                listado_productos_crear.append({
-                    'x_studio_unidades_de_negocio' : [1],
-                    'x_name' : str(prod.sku)+prod.unidadNegocio,
-                    'x_studio_sku_unidad_de_negocio':str(prod.sku),
-                    #'x_studio_ean_asociados': '',
-                    #'x_studio_ean' : nuevoProducto.ean,
-                    'x_studio_cdigo_regional' : prod.codRegional,
-                    'x_studio_departamento': idcategoria1,
-                    'x_studio_subdepartamento': idcategoria2,
-                    'x_studio_categora': idcategoria3,
-                    'x_studio_cdigo_referencia_proveedor' : prod.codRefProveedor,
-                    'x_studio_descripcin': prod.descripcion,
-                    'x_studio_origen' : origen,
-                    'x_studio_marca' : marca,
-                    'x_studio_proveedor': idProveedor,
-                    #'x_studio_pm_asociado': idActor['id'],
-                    'x_studio_stage_id' : 2,
-                    'x_studio_es_smk':1,
-                })
-
-
-        ids_nuevos = self.productos.create(listado_productos_crear)
-        nuevos_productos = [{'id':x[0], 'x_name': x[1]['x_name'], 'x_studio_sku_unidad_de_negocio':x[1]['x_studio_sku_unidad_de_negocio']} for x in zip(ids_nuevos,listado_productos_crear)]
-        if unidad_negocio=='TXD':
-            self.conjuntoProductosTXD = self.conjuntoProductosTXD + nuevos_productos
-            self.productosTXD_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosTXD }
-        elif unidad_negocio=='MDH':
-            self.conjuntoProductosMDH = self.conjuntoProductosMDH + nuevos_productos
-            self.productosMDH_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosMDH }
-        elif unidad_negocio=='SMK':
-            self.conjuntoProductosSMK = self.conjuntoProductosSMK + nuevos_productos
-            self.productosSMK_fastsearch = { prod['x_studio_sku_unidad_de_negocio']:prod for prod in self.conjuntoProductosSMK }
-        
-    def crearEan_multiple(self,lista_ean):
-        """
-        Crea varios ean al mismo tiempo. 
-
-        Parámetros: 
-        lista_ean: Lista de eans a crear. Los eans son objetos de la clase EAN 
-
-        Returns: No hay returns, pero los eans creados se actualizan y almacenan en la ram.
-
-        """
-        listado_ean_crear = [{              
-                'x_name':str(ean['x_name']),
-                'x_studio_sku':int(ean['x_studio_sku'][0]),
-                'x_studio_proveedor':int(ean['x_studio_proveedor'][0])} for ean in lista_ean]
-        
-        new_ids = self.ean.create(listado_ean_crear)
-        listado_ean_creados = [{'id':x[0],
-                                'x_name':x[1]['x_name'],
-                                 'x_studio_sku': x[1]['x_studio_sku'],
-                                 'x_studio_proveedor':x[1]['x_studio_proveedor']} for x in zip(new_ids,lista_ean)]
-        self.conjuntoEan = self.conjuntoEan + listado_ean_creados
-
-    def revisarDF_TXD_multiple(self,dataframe,tempo):
-        """
-        Metodo encargado de procesa los datos de TXD y crear los registros correspondientes.
-        Se llama "multiple" porque los registros por lotes.
-
-        Parámetros:
-        dataframe: Objeto de la clase dataFrame (no confundir con pd.DataFrame) con los datos.
-        tempo: Temporizados usado para botar el programa si se excede el tiempo de ejecucion. 
-
-        Returns: True si se completan todas las tareas, False si se excede el tiempo de ejecucion.-
-
-        """
-        def row2prod(datos_fila):
-            prod = Producto('TXD',datos_fila['SKU'],'','', datos_fila['PROVE_RAZON'],datos_fila['DESC_CLASE'],
-                    procesar_origen(datos_fila['ORIGEN'],'TXD'),datos_fila['MARCA'],'No completado - Nuevo',datos_fila['DESC_DEPTO'],
-                    datos_fila['DESC_SUBDEPTO'] ,'','','','','') 
-            return prod
-
-        def row2venta(datos_fila):
-            yearVenta,mesVenta = procesar_fecha_fast( datos_fila['FECHA'] ) 
-            ecoParis=0
-            if datos_fila['UNID_VEND'] > 0:
-                presParis = datos_fila['UNID_VEND']
-            else:
-                presParis = 0
-            if datos_fila['UN_ON_LINE'] > 0:
-                ecoParis = datos_fila['UN_ON_LINE']
-            else:
-                ecoParis = 0
-            
-            ventaAcrear = Venta(yearVenta,mesVenta,datos_fila['SKU'],'TXD',0,0,0,0,0,0,0,0,0,int(presParis),int(ecoParis))
-            return ventaAcrear
-
-        df = dataframe.dataFrame
-        filas_ventas = df[(df['UNID_VEND']+df['UN_ON_LINE']) > 0]
-
-        # CREAR PROVEEDORES NUEVOS
-        provs_nuevos = filas_ventas.apply(lambda row:not self.buscarProveedorRam_fast(row['PROVE_RAZON']), axis=1)
-        provs_nuevos = filas_ventas[provs_nuevos]['PROVE_RAZON'].to_list()
-        provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
-        pb = range(0,len(provs_nuevos),self.chunk_size)
-        for i in pb:
-            if not tempo.verificarTiempoLimite(time.time()):
-                return 0
-            self.crearProveedor_multiple(provs_nuevos[i:i+self.chunk_size])
-
-        # CREAR MARCAS NUEVAS
-        marcas_nuevas = filas_ventas.apply(lambda row:not self.buscarMarcaRam_fast(row['MARCA']),axis=1)
-        marcas_nuevas = filas_ventas[marcas_nuevas]['MARCA'].to_list()
-        pb = range(0,len(marcas_nuevas),self.chunk_size)
-        for i in pb:
-            if not tempo.verificarTiempoLimite(time.time()):
-                return 0
-            self.crearMarcaMultiple(marcas_nuevas[i:i+self.chunk_size])   
-
-        # CREAR PRODUCTOS NUEVOS
-        prods_nuevos = filas_ventas.apply(lambda row:not self.buscarProductoRam_fast(row['SKU'],'TXD'), axis=1)
-        prods_nuevos = filas_ventas[prods_nuevos]
-        prods_nuevos = list(prods_nuevos.apply(row2prod,axis=1))
-        pb = range(0,len(prods_nuevos),self.chunk_size)
-        for i in pb:
-            if not tempo.verificarTiempoLimite(time.time()):
-                return 0
-            self.crearProductos_multiple(prods_nuevos[i:i+self.chunk_size],'TXD')
-        
-        # CREAR VENTAS NUEVAS
-        ventas_nuevas_ = list(filas_ventas.apply(row2venta,axis=1))
-        ventas_nuevas = []
-        for venta in ventas_nuevas_:
-            if not self.buscarVentaRam(venta):
-                ventas_nuevas.append(venta)
-        pb = range(0,len(ventas_nuevas),self.chunk_size)
-        for i in pb:
-            if not tempo.verificarTiempoLimite(time.time()):
-                return 0
-            self.crearVentas_multiple(ventas_nuevas[i:i+self.chunk_size])
-        return 1
-    
-    def revisarDF_MDH_multiple(self,dataframe,tempo):
-        """
-        Metodo encargado de procesa los datos de MDH y crear los registros correspondientes.
-        Se llama "multiple" porque los registros por lotes.
-
-        Parámetros:
-        dataframe: Objeto de la clase dataFrame (no confundir con pd.DataFrame) con los datos.
-        tempo: Temporizados usado para botar el programa si se excede el tiempo de ejecucion. 
-
-        Returns: True si se completan todas las tareas, False si se excede el tiempo de ejecucion.-
-
-        """
-        if dataframe.tipo=='producto_MDH':
-            # ============================
-            # Funciones Utiles
-            def row2prod(row):
-                origen=row['Origen']
-                if origen=='IMPORTADOS':    origen='IMPORTADO'
-                elif origen=='NACIONALES':  origen='NACIONAL'
-                prod = Producto('MDH',row['Sku'],row['Ean'],row['Cod_Refer_Proveedor'],row['Proveedor'],
-                                row['Descripcion'],origen,row['Tipo_Marca'],'No completado - Nuevo',
-                                row['Departamento'],row['Categoria'],row['Sub_Categoria'],
-                                row['Medida_Producto'],'','',)
-                return prod
-            
-            def row2ean(datos_fila):
-                idProveedor = self.buscarProveedorRam_fast(datos_fila['Proveedor'])
-                id_producto = self.buscarProductoRam_fast(str(datos_fila['Sku']),'MDH')
-                return {
-                    'x_name': datos_fila['Ean'],
-                    'x_studio_sku': [id_producto, str(datos_fila['Sku'])+'MDH'],
-                    'x_studio_proveedor': [idProveedor, datos_fila['Proveedor']]
-                }
-
-            # ============================
-            df = dataframe.dataFrame
-
-            # CREAR PROVEEDOR NUEVO
-            provs_nuevos = df.apply(lambda row:not self.buscarProveedorRam_fast(row['Proveedor']),axis=1)
-            provs_nuevos = df[provs_nuevos]['Proveedor'].to_list()
-            provs_nuevos = list(set(provs_nuevos))
-            provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
-            pb = range(0,len(provs_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProveedor_multiple(provs_nuevos[i:i+self.chunk_size])
-
-            # CREAR MARCAS NUEVAS
-            marcas_nuevas = df.apply(lambda row:not self.buscarMarcaRam_fast(row['Tipo_Marca']),axis=1)
-            marcas_nuevas = df[marcas_nuevas]['Tipo_Marca'].to_list()
-            pb = range(0,len(marcas_nuevas),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearMarcaMultiple(marcas_nuevas[i:i+self.chunk_size])   
-
-
-            # CREAR PRODUCTOS NUEVOS
-            prods_nuevos = df.apply(lambda row:not self.buscarProductoRam_fast(str(row['Sku']),'MDH'), axis=1)
-            prods_nuevos = df[prods_nuevos]
-            prods_nuevos = list(prods_nuevos.apply(row2prod,axis=1))
-            prods_nuevos = list(set(prods_nuevos))
-            pb = range(0,len(prods_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProductos_multiple(prods_nuevos[i:i+self.chunk_size],'MDH')
-            
-            # CREAR EAN NUEVOS
-            ean_nuevos_ = list(df.apply(row2ean,axis=1))
-            ean_nuevos = []
-            for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH'):
-                    ean_nuevos.append(ean)
-            pb = range(0,len(ean_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearEan_multiple(ean_nuevos[i:i+self.chunk_size])
-
-            return 1
-        elif dataframe.tipo=='venta_MDH':
-            # ============================
-            # Funciones Utiles
-            def row2prod(datos_fila):
-                prod = Producto('MDH',datos_fila['Articulo'],datos_fila['Ean'],datos_fila['Cod_Proveedor_2'], 
-                                datos_fila['Nombre_Proveedor'],datos_fila['Nombre_Articulo'],
-                                procesar_origen(datos_fila['Categoria_Valorizacion'],'MDH'),
-                                datos_fila['Nombre_Marca'],'No completado - Nuevo',datos_fila['Nombre_Seccion'],
-                                datos_fila['Nombre_Rubro'] ,datos_fila['Nombre_Subrubro']) 
-                return prod
-            
-            def row2venta(datos_fila):
-                ventaAcrear = Venta(str(datos_fila['Ano']),datos_fila['Mes'],datos_fila['Articulo'],'MDH',0,0,0,0,0,0,
-                                    datos_fila['Cantidad_Presencial'],
-                                    datos_fila['Cantidad_Internet'],
-                                    datos_fila['Cantidad_Mayorista'],0,0)
-                return ventaAcrear
-            
-            def row2ean(datos_fila):
-                idProveedor = self.buscarProveedorRam_fast(datos_fila['Nombre_Proveedor'])
-                id_producto = self.buscarProductoRam_fast(str(datos_fila['Articulo']),'MDH')
-                return {
-                    'x_name': datos_fila['Ean'],
-                    'x_studio_sku': [id_producto, str(datos_fila['Articulo'])+'MDH'],
-                    'x_studio_proveedor': [idProveedor, datos_fila['Nombre_Proveedor']]
-                }
-            
-            # ============================
-            df=dataframe.dataFrame
-
-            filas_ventas = df[ (df['Cantidad_Presencial'] + df['Cantidad_Internet'] + df['Cantidad_Mayorista']) > 0 ]
-            
-            # CREAR PROVEEDORES NUEVOS
-            provs_nuevos = filas_ventas.apply(lambda row:not self.buscarProveedorRam_fast(row['Nombre_Proveedor']), axis=1)
-            provs_nuevos = filas_ventas[provs_nuevos]['Nombre_Proveedor'].to_list()
-            provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
-            pb = range(0,len(provs_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProveedor_multiple(provs_nuevos[i:i+self.chunk_size])
-
-            # CREAR MARCAS NUEVAS
-            marcas_nuevas = filas_ventas.apply(lambda row:not self.buscarMarcaRam_fast(row['Nombre_Marca']),axis=1)
-            marcas_nuevas = filas_ventas[marcas_nuevas]['Nombre_Marca'].to_list()
-            pb = range(0,len(marcas_nuevas),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearMarcaMultiple(marcas_nuevas[i:i+self.chunk_size])   
-
-            # CREAR PRODUCTOS NUEVOS
-            prods_nuevos = filas_ventas.apply(lambda row:not self.buscarProductoRam_fast(row['Articulo'],'MDH'), axis=1)
-            prods_nuevos = filas_ventas[prods_nuevos]
-            prods_nuevos = list(prods_nuevos.apply(row2prod,axis=1))
-            pb = range(0,len(prods_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProductos_multiple(prods_nuevos[i:i+self.chunk_size],'MDH')
-                
-            # CREAR VENTAS NUEVAS
-            ventas_nuevas_ = list(filas_ventas.apply(row2venta,axis=1))
-            ventas_nuevas = []
-            for venta in ventas_nuevas_:
-                if not self.buscarVentaRam(venta):
-                    ventas_nuevas.append(venta)
-            pb = range(0,len(ventas_nuevas),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearVentas_multiple(ventas_nuevas[i:i+self.chunk_size])
-
-            # CREAR EAN NUEVOS
-            ean_nuevos_ = list(filas_ventas.apply(row2ean,axis=1))
-            ean_nuevos = []
-            for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH'):
-                    ean_nuevos.append(ean)
-            pb = range(0,len(ean_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearEan_multiple(ean_nuevos[i:i+self.chunk_size])
-
-            return 1
-        elif dataframe.tipo=='categoria_MDH':
-            print('iniciando proceso categoria MDH')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            [1,2,3,4,]
-            df.columns=['Sku','Cod_regional','Ean','Descripcion','Departamento','Categoria','Sub_Categoria','clase','Tipo_Marca','Origen','Proveedor']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de categorias procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de categorias procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de categorias procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    skuProducto=df.loc[fila]['Sku']
-                    eanProducto=df.loc[fila]['Ean']
-                    busquedaSKU=self.buscarProductoRam(str(skuProducto),'MDH')
-                    if not busquedaSKU:
-                        prod= Producto(
-                            'MDH',
-                            skuProducto,
-                            eanProducto,
-                            '',
-                            df.loc[fila]['Proveedor'],
-                            df.loc[fila]['Descripcion'],
-                            df.loc[fila]['Origen'],
-                            df.loc[fila]['Tipo_Marca'],
-                            'No completado - Nuevo',
-                            df.loc[fila]['Departamento'],
-                            df.loc[fila]['Categoria'],
-                            df.loc[fila]['Sub_Categoria'],
-                            codRegional=df.loc[fila]['Cod_regional'],
-                            )
-                        busquedaSKU=self.crearProducto(prod)
-                    
-                    elif not self.buscarCodRegionalSKU(busquedaSKU,'MDH'):
-                        self.productos.write(busquedaSKU,{
-                            'x_studio_cdigo_regional': df.loc[fila]['Cod_regional'],
-                            })
-
-                    elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'MDH',NombreProveedor=df.loc[fila]['Proveedor']):
-                        idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
-                        if idProveedor:
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
-                        else:
-                            idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],'',''))
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedorCreado))
-                        self.crearEan(objEan,'MDH')
-                else:
-                    return 0                
-            print('Dataframe de categorias procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='proveedor_MDH':
-            print('iniciando proceso proveedor MDH')
-            #fila=0
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            #df.columns=['RUT','nombre','correo']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de proveedores procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de proveedores procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de proveedores procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    nombre=df.loc[fila][1]
-                    busquedaProveedor=self.buscarProveedorRam(df.loc[fila][1])
-                    if not busquedaProveedor:
-                        prod= Proveedor(
-                            df.loc[fila][1],
-                            df.loc[fila][0],
-                            df.loc[fila][2],
-                            )
-                        busquedaProveedor=self.crearProveedor(prod)
-
-                    else:
-                        self.proveedor.write(busquedaProveedor,{
-                            'vat': str(df.loc[fila][0]),
-                            'email': str(df.loc[fila][2]),
-                            })
-                else:
-                    return 0                
-            print('Dataframe de proveedores procesado en un 100%')
-            return 1
-  
-    def revisarDF_SMK_multiple(self,dataframe,tempo):
-        """
-        Metodo encargado de procesa los datos de TXD y crear los registros correspondientes.
-        Se llama "multiple" porque los registros por lotes.
-
-        Parámetros:
-        dataframe: Objeto de la clase dataFrame (no confundir con pd.DataFrame) con los datos.
-        tempo: Temporizados usado para botar el programa si se excede el tiempo de ejecucion. 
-
-        Returns: True si se completan todas las tareas, False si se excede el tiempo de ejecucion.-
-
-        """
-        
-        if dataframe.tipo=='producto_SM':
-            # ============================
-            # Funciones Utiles
-            def row2prod(row):
-                skuProducto=row['Sku']
-                eanProducto=row['Ean']
-                prod = Producto('SMK',skuProducto,eanProducto,row['Cod_Refer_Proveedor'],row['Proveedor'],
-                            row['Descripcion'],row['Origen'],row['Tipo_Marca'],
-                            'No completado - Nuevo',row['Departamento'],row['Categoria'],
-                            row['Sub_Categoria'],row['Medida_Producto'],'','')
-                return prod
-            
-            def row2ean(datos_fila):
-                idProveedor = self.buscarProveedorRam_fast(datos_fila['Proveedor'])
-                id_producto = self.buscarProductoRam_fast(str(datos_fila['Sku']),'SMK')
-                return {
-                    'x_name': datos_fila['Ean'],
-                    'x_studio_sku': [id_producto, str(datos_fila['Sku'])+'SMK'],
-                    'x_studio_proveedor': [idProveedor, datos_fila['Proveedor']]
-                }
-
-            # ============================
-            df = dataframe.dataFrame
-
-            # CREAR PROVEEDOR NUEVO
-            provs_nuevos = df.apply(lambda row:not self.buscarProveedorRam_fast(row['Proveedor']),axis=1)
-            provs_nuevos = df[provs_nuevos]['Proveedor'].to_list()
-            provs_nuevos = list(set(provs_nuevos))
-            provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
-            pb = range(0,len(provs_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProveedor_multiple(provs_nuevos[i:i+self.chunk_size])
-
-            # CREAR MARCAS NUEVAS
-            marcas_nuevas = df.apply(lambda row:not self.buscarMarcaRam_fast(row['Tipo_Marca']),axis=1)
-            marcas_nuevas = df[marcas_nuevas]['Tipo_Marca'].to_list()
-            pb = range(0,len(marcas_nuevas),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearMarcaMultiple(marcas_nuevas[i:i+self.chunk_size])   
-
-
-            # CREAR PRODUCTOS NUEVOS
-            prods_nuevos = df.apply(lambda row:not self.buscarProductoRam_fast(str(row['Sku']),'SMK'), axis=1)
-            prods_nuevos = df[prods_nuevos]
-            prods_nuevos = list(prods_nuevos.apply(row2prod,axis=1))
-            prods_nuevos = list(set(prods_nuevos))
-            pb = range(0,len(prods_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProductos_multiple(prods_nuevos[i:i+self.chunk_size],'SMK')
-            
-            # CREAR EAN NUEVOS
-            ean_nuevos_ = list(df.apply(row2ean,axis=1))
-            ean_nuevos = []
-            for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'SMK'):
-                    ean_nuevos.append(ean)
-            pb = range(0,len(ean_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearEan_multiple(ean_nuevos[i:i+self.chunk_size])
-
-            return 1 
-        elif dataframe.tipo=='venta_SM':
-            # ============================
-            # Funciones Utiles
-            def row2prod(datos_fila):
-                prod = Producto('SMK',str(datos_fila['Item_Id']),'','',datos_fila['Item_Desc'],'','','','No completado - Nuevo','','','','','','',)
-                return prod
-            
-            def row2venta(datos_fila):
-                yearVenta = procesarFecha(datos_fila['MesProceso'])[0]
-                mesVenta = int(procesarFecha(datos_fila['MesProceso'])[1])
-                ventaAcrear = Venta(yearVenta, mesVenta, str(datos_fila['Item_Id']),'SMK',
-                                datos_fila['Precencial_J'],datos_fila['Ecommerce_J'],datos_fila['Precencial_C'],
-                                datos_fila['Ecommerce_C'],datos_fila['Precencial_S'],datos_fila['Ecommerce_S'],
-                                0,0,0,0,0,)
-                return ventaAcrear
-            # ============================
-            df=dataframe.dataFrame
-            filas_ventas = df[ (df['Precencial_J'] + df['Ecommerce_J'] + 
-                                df['Precencial_C'] + df['Ecommerce_C'] + 
-                                df['Precencial_S'] + df['Ecommerce_S']) > 0 ]
-            
-
-            # CREAR PRODUCTOS NUEVOS
-            prods_nuevos = filas_ventas.apply(lambda row:not self.buscarProductoRam_fast(row['Item_Id'],'SMK'), axis=1)
-            prods_nuevos = filas_ventas[prods_nuevos]
-            prods_nuevos = list(prods_nuevos.apply(row2prod,axis=1))
-            pb = range(0,len(prods_nuevos),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearProductos_multiple(prods_nuevos[i:i+self.chunk_size],'SMK')
-                
-            # CREAR VENTAS NUEVAS
-            ventas_nuevas_ = list(filas_ventas.apply(row2venta,axis=1))
-            ventas_nuevas = []
-            for venta in ventas_nuevas_:
-                if not self.buscarVentaRam(venta):
-                    ventas_nuevas.append(venta)
-            pb = range(0,len(ventas_nuevas),self.chunk_size)
-            for i in pb:
-                if not tempo.verificarTiempoLimite(time.time()):
-                    return 0
-                self.crearVentas_multiple(ventas_nuevas[i:i+self.chunk_size])
-
-            return 1
-        elif dataframe.tipo=='insumo_SM':
-            print('iniciando proceso productos insumos SMK')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            print('iniciando proceso de insumos')
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de insumos procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de insumos procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de insumos procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    consumoJumbo=0
-                    consumoSisa=0
-                    consumoConveniencia=0
-                    if df.loc[fila]['Consumo_Jumbo']>0:
-                        consumoJumbo=df.loc[fila]['Consumo_Jumbo']
-                    if df.loc[fila]['Consumo_SISA']>0:
-                        consumoJumbo=df.loc[fila]['Consumo_SISA']
-                    if df.loc[fila]['Consumo_SPID']>0:
-                        consumoJumbo=df.loc[fila]['Consumo_SPID']
-                    if (consumoJumbo+consumoSisa+consumoConveniencia)>0:
-                        skuProducto=df.loc[fila]['Sku']
-                        eanProducto=df.loc[fila]['Ean']
-                        busquedaSKU=self.buscarProductoRam(str(skuProducto),'SMK')
-                        if not busquedaSKU:
-                            prod= Producto(
-                                'SMK',
-                                skuProducto,
-                                eanProducto,
-                                df.loc[fila]['Cod_Refer_Proveedor'],
-                                df.loc[fila]['Proveedor'],
-                                df.loc[fila]['Descripcion'],
-                                df.loc[fila]['Origen'],
-                                df.loc[fila]['Tipo_Marca'],
-                                'No completado - Nuevo',
-                                df.loc[fila]['Departamento'],
-                                df.loc[fila]['Categoria'],
-                                df.loc[fila]['Sub_Categoria'],
-                                '',
-                                '',
-                                '',
-                                )
-                            idSKU=self.crearProductoInsumo(prod)
-                            yearVenta = '2022'
-                            mesVenta = 12
-                            ventaAcrear = Venta(
-                                yearVenta, 
-                                mesVenta, 
-                                str(skuProducto),
-                                'SMK',
-                                consumoJumbo,
-                                0,
-                                consumoConveniencia,
-                                0,
-                                consumoSisa,
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                                )
-                            #print(self.buscarProductoRamId(ventaAcrear.idProducto,'SMK'))    
-                            self.crearVenta(ventaAcrear)
-                        elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'SMK'):
-                            idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
-
-                            if idProveedor:
-                                objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
-                            else:
-                                idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],df.loc[fila]['Cod_Refer_Proveedor'],''))
-                                objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedorCreado))
-                            self.crearEan(objEan,'SMK')
-
-            print('Dataframe de insumos procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='categoria_SM':
-            print('iniciando proceso categoria SMK')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            df.columns=['vacio1','vacio2','Sku','Cod_regional','Ean','Descripcion','Departamento','Categoria','Sub_Categoria','clase','Tipo_Marca','Origen','Proveedor']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de categorias procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de categorias procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de categorias procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    skuProducto=df.loc[fila]['Sku']
-                    eanProducto=df.loc[fila]['Ean']
-                    busquedaSKU=self.buscarProductoRam(str(skuProducto),'SMK')
-                    if not busquedaSKU:
-                        prod= Producto(
-                            'SMK',
-                            skuProducto,
-                            eanProducto,
-                            '',
-                            df.loc[fila]['Proveedor'],
-                            df.loc[fila]['Descripcion'],
-                            df.loc[fila]['Origen'],
-                            df.loc[fila]['Tipo_Marca'],
-                            'No completado - Nuevo',
-                            df.loc[fila]['Departamento'],
-                            df.loc[fila]['Categoria'],
-                            df.loc[fila]['Sub_Categoria'],
-                            codRegional=df.loc[fila]['Cod_regional'],
-                            )
-                        busquedaSKU=self.crearProducto(prod)
-
-                    elif not self.buscarEanRam(str(eanProducto),str(skuProducto)+'SMK'):
-                        idProveedor=self.buscarProveedorRam(df.loc[fila]['Proveedor'])
-                        if idProveedor:
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(busquedaSKU),str(idProveedor))
-                        else:
-                            idProveedorCreado=self.crearProveedor(Proveedor(df.loc[fila]['Proveedor'],'',''))
-                            objEan = Ean(str(df.loc[fila]['Ean']),str(self.buscarProductoRam(str(skuProducto),'SMK')),str(idProveedorCreado))
-                        self.crearEan(objEan,'SMK')
-                else:
-                    return 0                
-            print('Dataframe de categorias procesado en un 100%')
-            return 1
-        elif dataframe.tipo=='proveedor_SM':
-            print('iniciando proceso proveedor SMK')
-            fila=1
-            df=dataframe.dataFrame
-            largo=len(df)
-            avance25=1
-            avance50=1
-            avance75=1
-            
-            df.columns=['RUT','nombre','correo']
-            for fila in range(len(df)):
-                if tempo.verificarTiempoLimite(time.time()):
-                    if fila>largo/4 and avance25:
-                        print('Dataframe de proveedores procesado en un 25%')
-                        avance25=0
-                    elif fila>largo/2 and avance50:
-                        print('Dataframe de proveedores procesado en un 50%')
-                        avance50=0
-                    elif fila>(largo*3)/4 and avance75:
-                        print('Dataframe de proveedores procesado en un 75%')
-                        avance75=0
-                    #print(datoFila['Sku'])
-                    rutProveedor=df.loc[fila]['RUT']
-                    nombre=df.loc[fila]['nombre']
-                    correo=df.loc[fila]['correo']
-                    busquedaProveedor=self.buscarProveedorRam(df.loc[fila]['nombre'])
-                    if not busquedaProveedor:
-                        prod= Proveedor(
-                            df.loc[fila]['nombre'],
-                            df.loc[fila]['RUT'],
-                            df.loc[fila]['correo'],
-                            )
-                        busquedaProveedor=self.crearProveedor(prod)
-
-                    else:
-                        self.proveedor.write(busquedaProveedor,{
-                            'vat': df.loc[fila]['RUT'],
-                            'email': df.loc[fila]['correo'],
-                            })
-                else:
-                    return 0                
-            print('Dataframe de proveedores procesado en un 100%')
-            return 1
-     
-   
-    # ===== CREACION RAPIDA =====
-    
-def lambda_handlerEliminar(event,contex):
-    a= Aws()
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'SMKPROCESADOS')
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'MDHPROCESADOS')
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'TXDPROCESADOS')
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'SMK')
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'MDH')
-    a.eliminarDocumentosAntiguos(BUCKET_NAME,'TXD')
 def getFechaString():
     fecha = datetime.datetime.now()
     fechaFormato = fecha.strftime("%Y")+fecha.strftime("%m")+fecha.strftime("%d")
     return fechaFormato
-    
-
-def lambda_handler(event,contex):
-
-    temporizador = Temporizador(TIME_LIMIT)
-    a= Aws()
-
-    o=Odoo(ODOO_HOSTNAME,ODOO_DATABASE,ODOO_USERNAME,ODOO_PASSWORD)
-
-
-    uNegocio="SMK"
-    dataframesSMK=a.obtenerDataFrames(uNegocio,BUCKET_NAME,1,'cencoOdoo')
-    data=getDFProductos(dataframesSMK)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFCategorias(dataframesSMK)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFVentas(dataframesSMK)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFInsumo(dataframesSMK)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFProveedores(dataframesSMK)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    uNegocio="TXD"
-    dataframes=a.obtenerDataFrames(uNegocio,BUCKET_NAME,1,'cencoOdoo')
-    data=getDFProductos(dataframes)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFVentas(dataframes)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFInsumo(dataframes)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    uNegocio="MDH"
-    dataframesMDH=a.obtenerDataFrames(uNegocio,BUCKET_NAME,1,'cencoOdoo')
-    data=getDFProductos(dataframesMDH)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFVentas(dataframesMDH)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFInsumo(dataframesMDH)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFCategorias(dataframesMDH)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
-    data=getDFProveedores(dataframesMDH)
-    if not data==None:
-        o.procesarDF(data,a,temporizador)
 
 def buscarNombres(input,llave):
     output = []  
@@ -3996,9 +2529,9 @@ def buscarNombres(input,llave):
     return output
 
 def cargarDataFrame(direccionDocumento,tipo):
-
+    #hoja=pd.read_excel('TOTT05.6.01 Proveedores Faltantes Equipo DEC-TEX-HOG.xlsx',sheet_name=0)
     if tipo==1:
-        df=pd.read_csv(direccionDocumento,header=0, sep='|', engine='python', decimal=",")
+        df=pd.read_csv(direccionDocumento,header=0, sep='|', engine='python')
     elif tipo==2:
         df=pd.read_excel(direccionDocumento,sheet_name='ELEMENTOS EYE LEVANTADOS')
     return df
@@ -4009,25 +2542,6 @@ def procesarFecha(fecha):
     fechaSeparada.append(f[:4])
     fechaSeparada.append(f[-2:])
     return(fechaSeparada)
-
-# ===== CREACION RAPIDA ======
-def procesar_origen(origen,unidad_negocio):
-    if unidad_negocio=='TXD':
-        if origen=='I':     return 'IMPORTADO'
-        elif origen=='N':   return 'NACIONAL'
-        else:               return  'IMPORTADO'
-    elif unidad_negocio=='MDH':
-        if origen=='Importado':     return 'IMPORTADO'
-        elif origen=='Nacional':    return 'NACIONAL'
-        else:                       return ''
-
-def procesar_fecha_fast(date):
-    mes,anho = date.split('-')
-    numero_mes={'ene':1,'feb':2,'mar':3,'abr':4,'may':5,'jun':6,'jul':7,'ago':8,'sep':9,'oct':10,'nov':11,'dic':12}
-    anho = str(2000+int(anho))
-    mes = numero_mes[mes]
-    return anho,mes
-# ===== CREACION RAPIDA ======
 
 def getDFProductos(dframes):
     for daf in dframes:
@@ -4042,14 +2556,6 @@ def getDFVentas(dframes):
 def getDFInsumo(dframes):
     for df in dframes:
         if df.tipo.find('insumo')!=(-1):
-            return df
-def getDFCategorias(dframes):
-    for df in dframes:
-        if df.tipo.find('categoria')!=(-1):
-            return df
-def getDFProveedores(dframes):
-    for df in dframes:
-        if df.tipo.find('proveedor')!=(-1):
             return df
 def getDFSIGincompletoSISA(dframes):
     for df in dframes:
@@ -4072,5 +2578,84 @@ def getDFSIGincompletoTXD(dframes):
         if df.tipo.find('SIG_TXD(NO_COMPLETADO).xlsx')!=(-1):
             return df
     return None
+
+def lambda_handler(event,contex):
+    a=Aws()
+    temporizador=Temporizador(TIME_LIMIT)
+    o=Odoo(ODOO_HOSTNAME,ODOO_DATABASE,ODOO_USERNAME,ODOO_PASSWORD)
+    uNegocio="CORPORATIVO"
+    dataframes=a.obtenerDataFrames(uNegocio,BUCKET_NAME,2)
+    registrosSIG=o.conjutoDeclaracionesSIG
+    for fila in range(len(registrosSIG)):
+        idRegistro=registrosSIG[fila]['id']
+        generarDetalle=registrosSIG[fila]['x_studio_generar_detalle_elementos']
+        unidadNegocio=registrosSIG[fila]['x_studio_unidad_de_negocio'][1]
+        periodo=registrosSIG[fila]['x_studio_periodo'][1]
+        razonSocial=registrosSIG[fila]['x_studio_razon_social'][1]
+        docGenerado=registrosSIG[fila]['x_studio_doc_generado']
+        if not docGenerado and generarDetalle:
+            if razonSocial=='SISA':
+                dataf=getDFSIGincompletoSISA(dataframes)
+                dfSIG= o.generarDFDeclaracionSIGMetodo2('SISA',periodo,temporizador,dataf)
+                if dfSIG[1]==0:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(NO_COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(NO_COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(NO_COMPLETADO).xlsx')
+                elif dfSIG[1]==1:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(COMPLETADO).xlsx')
+                    a.s3_resource.meta.client.delete_object(
+                        Bucket='sftpasalvo-cencorep',
+                        Key='CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_SISA_SMK(NO_COMPLETADO).xlsx'
+                    )
+                    o.documentoGeneradoSIG(idRegistro)
+                return
+            elif razonSocial=='JUMBO + CONVENIENCIA':
+                dataf=getDFSIGincompletoJC(dataframes)
+                dfSIG= o.generarDFDeclaracionSIGMetodo2('JUMBO-CONVENIENCIA',periodo,temporizador,dataf)
+                if dfSIG[1]==0:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(NO_COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(NO_COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(NO_COMPLETADO).xlsx')
+                elif dfSIG[1]==1:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(COMPLETADO).xlsx')
+                    a.s3_resource.meta.client.delete_object(
+                        Bucket='sftpasalvo-cencorep',
+                        Key='CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_JUMBO-CONVENIENCIA_SMK(NO_COMPLETADO).xlsx'
+                    )
+                    o.documentoGeneradoSIG(idRegistro)
+                return
+            elif razonSocial=='EASY':
+                dataf=getDFSIGincompletoJC(dataframes)
+                dfSIG= o.generarDFDeclaracionSIGMetodo2('EASY',periodo,temporizador,dataf)
+                if dfSIG[1]==0:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(NO_COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(NO_COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(NO_COMPLETADO).xlsx')
+                elif dfSIG[1]==1:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(COMPLETADO).xlsx')
+                    a.s3_resource.meta.client.delete_object(
+                        Bucket='sftpasalvo-cencorep',
+                        Key='CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_MDH(NO_COMPLETADO).xlsx'
+                    )
+                    o.documentoGeneradoSIG(idRegistro)
+                return
+            elif razonSocial=='PARIS':
+                dataf=getDFSIGincompletoTXD(dataframes)
+                dfSIG= o.generarDFDeclaracionSIGMetodo2('PARIS',periodo,temporizador,dataf)
+                if dfSIG[1]==0:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(NO_COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(NO_COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(NO_COMPLETADO).xlsx')
+                elif dfSIG[1]==1:
+                    dfSIG[0].to_excel('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(COMPLETADO).xlsx',index=False,sheet_name='ELEMENTOS EYE LEVANTADOS')
+                    a.upload_file('/tmp/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(COMPLETADO).xlsx','sftpasalvo-cencorep','CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(COMPLETADO).xlsx')
+                    a.s3_resource.meta.client.delete_object(
+                        Bucket='sftpasalvo-cencorep',
+                        Key='CORPORATIVO/'+getFechaString()+'_LeyRep_declaracion_SIG_TXD(NO_COMPLETADO).xlsx'
+                    )
+                    o.documentoGeneradoSIG(idRegistro)
+                return
+
+
+
 
 
