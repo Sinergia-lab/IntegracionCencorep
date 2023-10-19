@@ -2403,7 +2403,7 @@ class Odoo:
                             else:
                                 resp = 0
                             if not resp:
-                                partes=self.buscarMaterialidadesIDSku(idSku)
+                                partes=self.buscarMaterialidadesIDSku(idSku) 
                                 if partes[0]:
                                     for parte in range(len(partes[0])):
                                         elemento1=partes[0][parte]
