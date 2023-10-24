@@ -2995,12 +2995,11 @@ class Odoo:
         Crea varios proveedores al mismo tiempo
 
         Parámetros: 
-        lista_proveedores: Lista con nombres de los proveedores. Los nombres de los proveedores son strings.
+        lista_proveedores: Lista con nombres de los proveedores. Los nombres de los proveedores pertenecen a la clase Proveedor.
 
         Returns: No hay returns, pero los nuevos proveedores se actualizan y quedan guardados en la ram.
 
         """
-        lista_proveedores = list(set(lista_proveedores))
         listado_proveedores_crear = [{'name':prov.nombre,'email':prov.correo,'x_studio_proveedor':1,'vat':prov.codProveedor} for prov in lista_proveedores]
         new_ids = self.proveedor.create(listado_proveedores_crear)
         listado_proveedores_creados = [{'id':x[0], 'name':x[1].nombre, 'email':x[1].correo} for x in zip(new_ids,lista_proveedores)]
@@ -3135,7 +3134,7 @@ class Odoo:
                 if not idcategoria2:
                     idcategoria2 = self.crearRubro(prod.categoria2)
 
-                idcategoria3=self.buscarCategoriaRam_fast(self.subrubros_fastsearch,prod.categoria2)
+                idcategoria3=self.buscarCategoriaRam_fast(self.subrubros_fastsearch,prod.categoria3)
                 if not idcategoria3:
                     idcategoria3 = self.crearSubRubro(prod.categoria3)
 
@@ -3296,6 +3295,7 @@ class Odoo:
         # CREAR PROVEEDORES NUEVOS
         provs_nuevos = filas_ventas.apply(lambda row:not self.buscarProveedorRam_fast(row['PROVE_RAZON']), axis=1)
         provs_nuevos = filas_ventas[provs_nuevos]['PROVE_RAZON'].to_list()
+        provs_nuevos = list(set(provs_nuevos))
         provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
         pb = range(0,len(provs_nuevos),self.chunk_size)
         for i in pb:
@@ -3407,9 +3407,12 @@ class Odoo:
             # CREAR EAN NUEVOS
             ean_nuevos_ = list(df.apply(row2ean,axis=1))
             ean_nuevos = []
+            ean_control_set = set()         # SIRVE PARA Q NO HAYAN EANs REPETIDOS
             for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH'):
+                control_string = f"{ean['x_name']}-{ean['x_studio_sku'][1]}"
+                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH') and not (control_string in ean_control_set):
                     ean_nuevos.append(ean)
+                    ean_control_set.add(control_string)
             pb = range(0,len(ean_nuevos),self.chunk_size)
             for i in pb:
                 if not tempo.verificarTiempoLimite(time.time()):
@@ -3452,6 +3455,7 @@ class Odoo:
             # CREAR PROVEEDORES NUEVOS
             provs_nuevos = filas_ventas.apply(lambda row:not self.buscarProveedorRam_fast(row['Nombre_Proveedor']), axis=1)
             provs_nuevos = filas_ventas[provs_nuevos]['Nombre_Proveedor'].to_list()
+            provs_nuevos = list(set(provs_nuevos))
             provs_nuevos = [Proveedor(prov_name,'','') for prov_name in provs_nuevos]
             pb = range(0,len(provs_nuevos),self.chunk_size)
             for i in pb:
@@ -3493,9 +3497,12 @@ class Odoo:
             # CREAR EAN NUEVOS
             ean_nuevos_ = list(filas_ventas.apply(row2ean,axis=1))
             ean_nuevos = []
+            ean_control_set = set()         # SIRVE PARA Q NO HAYAN EANs REPETIDOS
             for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH'):
+                control_string = f"{ean['x_name']}-{ean['x_studio_sku'][1]}"
+                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'MDH') and not (control_string in ean_control_set):
                     ean_nuevos.append(ean)
+                    ean_control_set.add(control_string)
             pb = range(0,len(ean_nuevos),self.chunk_size)
             for i in pb:
                 if not tempo.verificarTiempoLimite(time.time()):
@@ -3677,9 +3684,13 @@ class Odoo:
             # CREAR EAN NUEVOS
             ean_nuevos_ = list(df.apply(row2ean,axis=1))
             ean_nuevos = []
+            ean_control_set = set()     # SIRVE PARA Q NO HAYAN EANs REPETIDOS
             for ean in ean_nuevos_:
-                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'SMK'):
+                control_string = f"{ean['x_name']}-{ean['x_studio_sku'][1]}"
+                if not self.buscarEanRam(ean['x_name'],ean['x_studio_sku'][1],'SMK') and not (control_string in ean_control_set):
                     ean_nuevos.append(ean)
+                    ean_control_set.add(control_string)
+
             pb = range(0,len(ean_nuevos),self.chunk_size)
             for i in pb:
                 if not tempo.verificarTiempoLimite(time.time()):
