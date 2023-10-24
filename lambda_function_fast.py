@@ -401,9 +401,6 @@ class Aws:
                         self.eliminarDocumentoFolder(nombeBucket,archivo.key)
 
 
-
-
-
 class Odoo:
     #PARÁMETROS INICIALES
     def __init__(self,hostname,database,login,password):
@@ -479,6 +476,7 @@ class Odoo:
         self.secciones_fastsearch = {x['x_name']:x for x in self.conjuntoSecciones}
         self.rubros_fastsearch = {x['x_name']:x for x in self.conjuntoRubro}
         self.subrubros_fastsearch = {x['x_name']:x for x in self.conjuntoSubRubro}
+        self.categorias_fastsearch = {cat['x_name']:cat for cat in self.conjuntocategorias}
         # ===== CREACION RAPIDA =====
  
         print('Objeto establecido')
@@ -1854,6 +1852,7 @@ class Odoo:
                 'x_name':nombreDepartamento,
             })
         self.conjuntoDepartamentos.append({'id': idDepartamento, 'x_name': nombreDepartamento})
+        self.departamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoDepartamentos}
         return idDepartamento
     def crearSubDepartamento(self,nombreSubDepartamento):
         idSubDepartamento=self.buscarCategoriaRam(self.conjuntoSubDepartamentos,nombreSubDepartamento)
@@ -1862,6 +1861,7 @@ class Odoo:
                 'x_name':nombreSubDepartamento,
             })
         self.conjuntoSubDepartamentos.append({'id': idSubDepartamento, 'x_name': nombreSubDepartamento})
+        self.subdepartamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoSubDepartamentos}
         return idSubDepartamento
     def crearCategoria(self,nombreCategoria):
         idCategoria=self.buscarCategoriaRam(self.conjuntocategorias,nombreCategoria)
@@ -1870,6 +1870,7 @@ class Odoo:
                 'x_name':nombreCategoria,
             })
         self.conjuntocategorias.append({'id': idCategoria, 'x_name': nombreCategoria})
+        self.categorias_fastsearch = {cat['x_name']:cat for cat in self.conjuntocategorias}
         return idCategoria
     def crearSeccion(self,nombreSeccion):
         idSeccion=self.buscarCategoriaRam(self.conjuntoSecciones,nombreSeccion)
@@ -1878,6 +1879,7 @@ class Odoo:
                 'x_name':nombreSeccion,
             })
         self.conjuntoSecciones.append({'id': idSeccion, 'x_name': nombreSeccion})
+        self.secciones_fastsearch = {x['x_name']:x for x in self.conjuntoSecciones}
         return idSeccion
     def crearRubro(self,nombreRubro):
         idRubro=self.buscarCategoriaRam(self.conjuntoRubro,nombreRubro)
@@ -1886,6 +1888,7 @@ class Odoo:
                 'x_name':nombreRubro,
             })
         self.conjuntoRubro.append({'id': idRubro, 'x_name': nombreRubro})
+        self.rubros_fastsearch = {x['x_name']:x for x in self.conjuntoRubro}
         return idRubro
     def crearSubRubro(self,nombreSubRubro):
         idSubRubro=self.buscarCategoriaRam(self.conjuntoSubRubro,nombreSubRubro)
@@ -1894,6 +1897,7 @@ class Odoo:
                 'x_name':nombreSubRubro,
             })
         self.conjuntoSubRubro.append({'id': idSubRubro, 'x_name': nombreSubRubro})
+        self.subrubros_fastsearch = {x['x_name']:x for x in self.conjuntoSubRubro}
         return idSubRubro
     def documentoGeneradoSIG(self,idRegistroSIG):
         ob=self.declaracionesSIG.search([('id','=',idRegistroSIG)])
@@ -3115,6 +3119,13 @@ class Odoo:
             except:
                 raise Exception('Error, no existe el idProveedor para',prod.proveedor)
 
+        # self.departamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoDepartamentos}
+        # self.subdepartamentos_fastseach = { dep['x_name']:dep for dep in self.conjuntoSubDepartamentos}
+        # self.secciones_fastsearch = {x['x_name']:x for x in self.conjuntoSecciones}
+        # self.rubros_fastsearch = {x['x_name']:x for x in self.conjuntoRubro}
+        # self.subrubros_fastsearch = {x['x_name']:x for x in self.conjuntoSubRubro}
+
+
             # CREAR CATEGORIAS
             if unidad_negocio=='TXD':
                 idcategoria1=self.buscarCategoriaRam_fast(self.departamentos_fastseach,prod.categoria1)
@@ -3137,6 +3148,7 @@ class Odoo:
                 idcategoria3=self.buscarCategoriaRam_fast(self.subrubros_fastsearch,prod.categoria3)
                 if not idcategoria3:
                     idcategoria3 = self.crearSubRubro(prod.categoria3)
+
 
             elif unidad_negocio == 'SMK':
                 idcategoria1=self.buscarCategoriaRam_fast(self.departamentos_fastseach,prod.categoria1)
